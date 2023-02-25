@@ -23,4 +23,5 @@ class CsvToDatabase:
 
     def execute(self, table_name):
         df = self.read_csv_files()
-        self.write_to_database(df, table_name)
+        if(df.count()!=0):
+            self.write_to_database(df, table_name)
