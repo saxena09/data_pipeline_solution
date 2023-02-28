@@ -2,10 +2,14 @@
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import lit,when,col
 from functools import reduce
+import logging as logger 
 
 class CsvToDatabase:
     def __init__(self, csv_paths, db_host, db_schema,table_name):
         self.csv_paths = csv_paths
+	self.fileName = "file_to_log.log"
+	self.logger=logger
+	self.logger.basicConfig(level=logger.DEBUG,filename=self.fileName,filemode='w+',format=f'%(levelname)s - %(lineno)s = %(asctime)s - %(message)s')
         self.db_host = db_host
         self.db_schema = db_schema
 	  self.table_name=table_name
@@ -14,6 +18,7 @@ class CsvToDatabase:
     def read_csv_files(self):
         df = self.spark.read.option("header", "true").csv(self.csv_path)
 	input_df=df.withColumnRenamed("Field3","input_Field3").withColumnRenamed("Field4","input_Field4").withColumnRenamed("Field5","input_Field5")
+	self.logger.info("Read input data successfully")
         return input_df
 
     def read_from_database(self):
@@ -31,7 +36,7 @@ class CsvToDatabase:
     	         .option("password", db_properties.password) \
    		 .option("driver", db_properties.driver) \
    		 .load()
-
+	self.logger.info("Read input data frm db successfully")
 	return target_df
 
 
@@ -57,7 +62,7 @@ class CsvToDatabase:
 
 	 final_df = inserted_df.union(updated_df).union(deleted_df).select(
     				[col(c) for c in pk_cols] + when_clause + [col("operation")])
-
+	 self.logger.info("Steps executed successfully")
 	 return final_df
 	  
 
@@ -69,10 +74,13 @@ class CsvToDatabase:
             "password": "your-password"
         }
         df.write.jdbc(url=db_url, table=self.table_name, mode="overwrite", properties=db_properties)
-
+	self.logger.info("written output data successfully")
 
     def execute(self, table_name):
-        input_df = self.read_csv_files()
-	target_df = self.read_from_database()
-	final_df = self.execute_steps(input_df,target_df)
-        self.write_to_database(final_df)
+	try:
+	    input_df = self.read_csv_files()
+	    target_df = self.read_from_database()
+	    final_df = self.execute_steps(input_df,target_df)
+	    self.write_to_database(final_df)
+        except Exception as e:
+            self.logger.error("Error executinng scritp",e)
